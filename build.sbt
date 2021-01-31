@@ -2,7 +2,7 @@ name := "akka-quartz-scheduler"
 
 organization := "com.enragedginger"
 
-version := "1.8.5-akka-2.6.x"
+version := "1.9.0-akka-2.6.x"
 
 scalaVersion in ThisBuild := "2.13.3"
 
@@ -24,18 +24,21 @@ libraryDependencies ++= Seq(
 )
 
 resolvers += "Sonatype OSS Snapshots" at "https://oss.sonatype.org/content/repositories/snapshots"
-  
+
+bintrayOrganization := Some("justa")
+licenses += ("Apache-2.0", url("https://opensource.org/licenses/Apache-2.0"))
+
 pomIncludeRepository := { _ => false }
 
 publishMavenStyle := true
 
-publishTo := {
-    val nexus = "https://oss.sonatype.org/"
-    if (isSnapshot.value)
-        Some("snapshots" at nexus + "content/repositories/snapshots")
-    else
-        Some("releases"  at nexus + "service/local/staging/deploy/maven2")
-}
+//publishTo := {
+//    val nexus = "https://oss.sonatype.org/"
+//    if (isSnapshot.value)
+//        Some("snapshots" at nexus + "content/repositories/snapshots")
+//    else
+//        Some("releases"  at nexus + "service/local/staging/deploy/maven2")
+//}
 
 //useGpg := true
 
