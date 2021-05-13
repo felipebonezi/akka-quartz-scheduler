@@ -1,13 +1,23 @@
 language: scala
 scala:
-- 2.12.8
-- 2.13.1
+  - 2.12.13
+  - 2.13.5
+
+os:
+  - linux
+
 jdk:
-- openjdk8
+  - oraclejdk8
+  - oraclejdk11
+
+script:
+  - sbt ++$TRAVIS_SCALA_VERSION scalafmtCheckAll test:scalafmtCheckAll test
+
 cache:
   directories:
     - $HOME/.ivy2/cache
     - $HOME/.sbt/boot/
+
 before_cache:
   # Tricks to avoid unnecessary cache updates
   - find $HOME/.ivy2 -name "ivydata-*.properties" -delete
