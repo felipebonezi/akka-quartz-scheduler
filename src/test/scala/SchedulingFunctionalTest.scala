@@ -1,12 +1,13 @@
 package com.typesafe.akka.extension.quartz
 
-import com.typesafe.config.{Config, ConfigFactory}
+import com.typesafe.config.Config
+import com.typesafe.config.ConfigFactory
 
 object SchedulingFunctionalTest {
 
   val tickTolerance = 1000
 
-  lazy val sampleConfiguration: Config = { ConfigFactory.parseString("""
+  lazy val sampleConfiguration: Config = ConfigFactory.parseString("""
     akka {
       event-handlers = ["akka.testkit.TestEventListener"]
       loglevel = "INFO"
@@ -99,5 +100,4 @@ object SchedulingFunctionalTest {
       }
     }
                                                                """.stripMargin)
-  }
 }

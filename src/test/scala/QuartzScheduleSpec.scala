@@ -1,30 +1,31 @@
 package com.typesafe.akka.extension.quartz
 
-import org.specs2.runner.JUnitRunner
-import org.specs2.Specification
-import org.junit.runner.RunWith
-import org.specs2.matcher.ThrownExpectations
 import com.typesafe.config.ConfigFactory
-import akka.actor.ActorSystem
-import java.util.{Calendar, GregorianCalendar, Date, TimeZone}
-import org.quartz.impl.calendar._
-import org.quartz.impl.triggers.CronTriggerImpl
+import org.junit.runner.RunWith
 import org.quartz.TriggerUtils
+import org.quartz.impl.triggers.CronTriggerImpl
+import org.specs2.Specification
+import org.specs2.matcher.ThrownExpectations
+import org.specs2.runner.JUnitRunner
+
+import java.util.Calendar
+import java.util.TimeZone
 import scala.collection.JavaConverters._
 
 @RunWith(classOf[JUnitRunner])
-class QuartzScheduleSpec extends Specification with ThrownExpectations { def is =
-  sequential ^
-  "This is a specification to validate the behavior of the Quartz Schedule configuration parser" ^
-    "The configuration parser should"                            ^
-      "Fetch a list of all schedules in the configuration block" ! parseScheduleList ^
-      "Be able to parse out a cron schedule"                     ! parseCronSchedule ^
-      "Be able to parse out a cron schedule w/ calendars"        ! parseCronScheduleCalendars ^
-                                                                   end
+class QuartzScheduleSpec extends Specification with ThrownExpectations {
 
-  def parseScheduleList = {
+  def is =
+    sequential ^
+      "This is a specification to validate the behavior of the Quartz Schedule configuration parser" ^
+      "The configuration parser should" ^
+      "Fetch a list of all schedules in the configuration block" ! parseScheduleList ^
+      "Be able to parse out a cron schedule" ! parseCronSchedule ^
+      "Be able to parse out a cron schedule w/ calendars" ! parseCronScheduleCalendars ^
+      end
+
+  def parseScheduleList =
     schedules must haveSize(2)
-  }
 
   def parseCronSchedule = {
     schedules must haveKey("cronEvery10Seconds")
@@ -39,11 +40,14 @@ class QuartzScheduleSpec extends Specification with ThrownExpectations { def is 
     val t = _t.asInstanceOf[CronTriggerImpl]
 
     val startHour = 3
-    val endHour = 9
-    val numExpectedFirings = (endHour - startHour) * 60 /* 60 minutes in an hour */ * 6 /* 6 ticks per minute */
-    val firings = TriggerUtils.computeFireTimesBetween(t, null, getDate(startHour, 0), getDate(endHour, 0)).asScala
+    val endHour   = 9
+    val numExpectedFirings =
+      (endHour - startHour) * 60 /* 60 minutes in an hour */ * 6 /* 6 ticks per minute */
+    val firings = TriggerUtils
+      .computeFireTimesBetween(t, null, getDate(startHour, 0), getDate(endHour, 0))
+      .asScala
 
-    firings must have size(numExpectedFirings)
+    firings must have size numExpectedFirings
   }
 
   def parseCronScheduleCalendars = {
@@ -64,13 +68,15 @@ class QuartzScheduleSpec extends Specification with ThrownExpectations { def is 
     val t = _t.asInstanceOf[CronTriggerImpl]
 
     val startHour = 3
-    val endHour = 22
+    val endHour   = 22
     // we don't follow the startHour and endHour because of business hours..
     // the cron exemption rule (taken from quartz docs) actually lets jobs run from 0800 - 1759 (doh)
     val numExpectedFirings = (18 - 8) * 60 /* 60 minutes in an hour */ * 2 /* 2 ticks per minute */
-    val firings = TriggerUtils.computeFireTimesBetween(t, bizHoursCal, getDate(startHour, 0), getDate(endHour, 0)).asScala
+    val firings = TriggerUtils
+      .computeFireTimesBetween(t, bizHoursCal, getDate(startHour, 0), getDate(endHour, 0))
+      .asScala
 
-    firings must have size(numExpectedFirings)
+    firings must have size numExpectedFirings
   }
 
   def getDate(hour: Int, minute: Int)(implicit tz: TimeZone = TimeZone.getTimeZone("UTC")) = {
@@ -83,9 +89,8 @@ class QuartzScheduleSpec extends Specification with ThrownExpectations { def is 
 
   lazy val schedules = QuartzSchedules(sampleConfiguration, TimeZone.getTimeZone("UTC"))
 
-  lazy val sampleCalendarConfig = {
-    ConfigFactory.parseString(
-      """
+  lazy val sampleCalendarConfig =
+    ConfigFactory.parseString("""
       calendars {
         CronOnlyBusinessHours {
           type = Cron
@@ -94,9 +99,8 @@ class QuartzScheduleSpec extends Specification with ThrownExpectations { def is 
         }
       }
       """.stripMargin)
-  }
 
-  lazy val sampleConfiguration = {
+  lazy val sampleConfiguration =
     ConfigFactory.parseString("""
       schedules {
         cronEvery30Seconds {
@@ -110,5 +114,4 @@ class QuartzScheduleSpec extends Specification with ThrownExpectations { def is 
         }
       }
     """.stripMargin)
-  }
 }

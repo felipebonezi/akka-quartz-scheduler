@@ -1,10 +1,11 @@
 package com.typesafe.akka.extension.quartz
 
 import akka.actor.testkit.typed.scaladsl.ActorTestKit
+import akka.actor.typed.ActorRef
+import akka.actor.typed.Behavior
 import akka.actor.typed.eventstream.EventStream
 import akka.actor.typed.eventstream.EventStream.Subscribe
 import akka.actor.typed.scaladsl.Behaviors
-import akka.actor.typed.{ActorRef, Behavior}
 import akka.japi.Option.Some
 import org.junit.runner.RunWith
 import org.scalatest.BeforeAndAfterAll
@@ -12,19 +13,20 @@ import org.scalatest.matchers.must.Matchers
 import org.scalatest.wordspec.AnyWordSpecLike
 import org.specs2.runner.JUnitRunner
 
+import java.util.Calendar
+import java.util.Date
 import java.util.logging.Logger
-import java.util.{Calendar, Date}
 import scala.concurrent._
 import scala.concurrent.duration._
 
 @RunWith(classOf[JUnitRunner])
 class QuartzTypedSchedulerFunctionalSpec
-  extends AnyWordSpecLike
-  with Matchers
-  with BeforeAndAfterAll {
+    extends AnyWordSpecLike
+    with Matchers
+    with BeforeAndAfterAll {
 
   private lazy val testKit = ActorTestKit(SchedulingFunctionalTest.sampleConfiguration)
-  private val _system = testKit.internalSystem
+  private val _system      = testKit.internalSystem
 
   override protected def afterAll(): Unit = {
     this.testKit.shutdownTestKit()
@@ -37,21 +39,29 @@ class QuartzTypedSchedulerFunctionalSpec
 
     "Reject a job which is not named in the config" in {
       val receiver = testKit.spawn(ScheduleTestReceiver())
-      val probe = testKit.createTestProbe[AnyRef]()
+      val probe    = testKit.createTestProbe[AnyRef]()
       receiver ! NewProbe(probe.ref)
 
       an[IllegalArgumentException] must be thrownBy {
-        QuartzSchedulerTypedExtension(_system).scheduleTyped("fooBarBazSpamEggsOMGPonies!", receiver, Tick)
+        QuartzSchedulerTypedExtension(_system).scheduleTyped(
+          "fooBarBazSpamEggsOMGPonies!",
+          receiver,
+          Tick
+        )
       }
 
     }
 
     "Properly Setup & Execute a Cron Job with correct fireTime" in {
       val receiver = testKit.spawn(ScheduleTestReceiver())
-      val probe = testKit.createTestProbe[AnyRef]()
+      val probe    = testKit.createTestProbe[AnyRef]()
       receiver ! NewProbe(probe.ref)
       val extension = QuartzSchedulerTypedExtension(_system)
-      val jobDt = extension.scheduleTyped("cronEvery10SecondsWithFireTime", receiver, MessageRequireFireTime(Tick))
+      val jobDt = extension.scheduleTyped(
+        "cronEvery10SecondsWithFireTime",
+        receiver,
+        MessageRequireFireTime(Tick)
+      )
 
       /* This is a somewhat questionable test as the timing between components may not match the tick off. */
       val receipt: Seq[AnyRef] = probe.receiveMessages(5, Duration(50, SECONDS))
@@ -63,16 +73,20 @@ class QuartzTypedSchedulerFunctionalSpec
         assert(obj === jobDt.getTime + i * 10 * 1000 +- tickTolerance)
       }
 
-      receipt must have size (5)
+      receipt must have size 5
       extension.cancelJob("cronEvery10SecondsWithFireTime")
     }
 
     "Properly Setup & Execute a Cron Job with correct fireTimes" in {
       val receiver = testKit.spawn(ScheduleTestReceiver())
-      val probe = testKit.createTestProbe[AnyRef]()
+      val probe    = testKit.createTestProbe[AnyRef]()
       receiver ! NewProbe(probe.ref)
       val extension = QuartzSchedulerTypedExtension(_system)
-      val jobDt = extension.scheduleTyped("cronEvery10SecondsWithFireTimes", receiver, MessageRequireFireTime(Tick))
+      val jobDt = extension.scheduleTyped(
+        "cronEvery10SecondsWithFireTimes",
+        receiver,
+        MessageRequireFireTime(Tick)
+      )
 
       val receipt = probe.receiveMessages(5, Duration(1, MINUTES))
       0 until 5 foreach { i =>
@@ -81,21 +95,21 @@ class QuartzTypedSchedulerFunctionalSpec
             (scheduledFireTime, previousFireTime, nextFireTime)
         }
 
-        val expectedCurrent = jobDt.getTime + i * 10 * 1000
+        val expectedCurrent  = jobDt.getTime + i * 10 * 1000
         val expectedPrevious = if (i == 0) 0 else expectedCurrent - 10 * 1000
-        val expectedNext = expectedCurrent + 10 * 1000
+        val expectedNext     = expectedCurrent + 10 * 1000
         assert(obj._1 === expectedCurrent +- tickTolerance)
         assert(obj._2.getOrElse(0L) === expectedPrevious +- tickTolerance)
         assert(obj._3.get === expectedNext +- tickTolerance)
       }
 
-      receipt must have size (5)
+      receipt must have size 5
       extension.cancelJob("cronEvery10SecondsWithFireTime")
     }
 
     "Properly Setup & Execute a Cron Job" in {
       val receiver = testKit.spawn(ScheduleTestReceiver())
-      val probe = testKit.createTestProbe[AnyRef]()
+      val probe    = testKit.createTestProbe[AnyRef]()
       receiver ! NewProbe(probe.ref)
       val extension = QuartzSchedulerTypedExtension(_system)
       extension.scheduleTyped("cronEvery10Seconds", receiver, Tick)
@@ -104,61 +118,66 @@ class QuartzTypedSchedulerFunctionalSpec
       val receipt = probe.receiveMessages(5, Duration(1, MINUTES))
 
       receipt must contain(Tock)
-      receipt must have size (5)
+      receipt must have size 5
       extension.cancelJob("cronEvery10Seconds")
     }
 
     "Properly Setup & Execute a Cron Job via Event Stream" in {
       val receiver = testKit.spawn(ScheduleTestReceiver())
-      val probe = testKit.createTestProbe[AnyRef]()
+      val probe    = testKit.createTestProbe[AnyRef]()
       receiver ! NewProbe(probe.ref)
       _system.eventStream.tell(Subscribe(receiver))
       val extension = QuartzSchedulerTypedExtension(_system)
-      extension.scheduleTyped[EventStream.Command]("cronEvery12Seconds", _system.eventStream, EventStream.Publish(Tick))
-
+      extension.scheduleTyped[EventStream.Command](
+        "cronEvery12Seconds",
+        _system.eventStream,
+        EventStream.Publish(Tick)
+      )
 
       /* This is a somewhat questionable test as the timing between components may not match the tick off. */
       val receipt = probe.receiveMessages(5, Duration(1, MINUTES))
 
       receipt must contain(Tock)
-      receipt must have size (5)
+      receipt must have size 5
       extension.cancelJob("cronEvery12Seconds")
     }
 
     "Delayed Setup & Execute a Cron Job" in {
-      val now = Calendar.getInstance()
-      val t = now.getTimeInMillis
+      val now      = Calendar.getInstance()
+      val t        = now.getTimeInMillis
       val after65s = new Date(t + (35 * 1000))
 
       val receiver = testKit.spawn(ScheduleTestReceiver())
-      val probe = testKit.createTestProbe[AnyRef]()
+      val probe    = testKit.createTestProbe[AnyRef]()
       receiver ! NewProbe(probe.ref)
       val extension = QuartzSchedulerTypedExtension(_system)
-      val jobDt = extension.scheduleTyped("cronEvery15Seconds", receiver, Tick, Some(after65s))
+      val jobDt     = extension.scheduleTyped("cronEvery15Seconds", receiver, Tick, Some(after65s))
 
       var receipt = Seq[AnyRef]()
       an[AssertionError] must be thrownBy {
         /* This is a somewhat questionable test as the timing between components may not match the tick off. */
         receipt = probe.receiveMessages(2, Duration(10, SECONDS))
       }
-      receipt must have size (0)
+      receipt must have size 0
 
       /*
       Get the startDate and calculate the next run based on the startDate
       The schedule only runs on 0,15,30,45 each minute and will run at the first opportunity after the startDate
        */
       val scheduleCalender = Calendar.getInstance()
-      val jobCalender = Calendar.getInstance()
+      val jobCalender      = Calendar.getInstance()
       scheduleCalender.setTime(after65s)
       jobCalender.setTime(jobDt)
 
-      val seconds = scheduleCalender.get(Calendar.SECOND)
+      val seconds    = scheduleCalender.get(Calendar.SECOND)
       val addSeconds = 15 - (seconds % 15)
-      val secs = if (addSeconds > 0) addSeconds else 15
+      val secs       = if (addSeconds > 0) addSeconds else 15
       scheduleCalender.add(Calendar.SECOND, secs)
 
       //Dates must be equal in seconds
-      Math.floor(jobCalender.getTimeInMillis / 1000).toLong mustEqual Math.floor(scheduleCalender.getTimeInMillis / 1000).toLong
+      Math.floor(jobCalender.getTimeInMillis / 1000).toLong mustEqual Math
+        .floor(scheduleCalender.getTimeInMillis / 1000)
+        .toLong
       extension.cancelJob("cronEvery15Seconds")
     }
   }
@@ -166,13 +185,19 @@ class QuartzTypedSchedulerFunctionalSpec
   "The Quartz Scheduling Extension with Reschedule" must {
     "Reschedule an existing Cron Job" in {
       val receiver = testKit.spawn(ScheduleTestReceiver())
-      val probe = testKit.createTestProbe[AnyRef]()
+      val probe    = testKit.createTestProbe[AnyRef]()
       receiver ! NewProbe(probe.ref)
       val extension = QuartzSchedulerTypedExtension(_system)
       extension.scheduleTyped("cronEveryEvenSecond", receiver, Tick)
 
       noException should be thrownBy {
-        val newDate = QuartzSchedulerTypedExtension(_system).rescheduleTypedJob("cronEveryEvenSecond", receiver, Tick, None, "0/59 * * ? * *")
+        val newDate = QuartzSchedulerTypedExtension(_system).rescheduleTypedJob(
+          "cronEveryEvenSecond",
+          receiver,
+          Tick,
+          None,
+          "0/59 * * ? * *"
+        )
         val jobCalender = Calendar.getInstance()
         jobCalender.setTime(newDate)
         jobCalender.get(Calendar.SECOND) mustEqual 59
@@ -183,9 +208,10 @@ class QuartzTypedSchedulerFunctionalSpec
 
   "Get next trigger date by schedule name" in {
     val receiver = testKit.spawn(ScheduleTestReceiver())
-    val probe = testKit.createTestProbe[AnyRef]()
+    val probe    = testKit.createTestProbe[AnyRef]()
     receiver ! NewProbe(probe.ref)
-    val jobDt = QuartzSchedulerTypedExtension(_system).scheduleTyped("cronEveryMidnight", receiver, Tick)
+    val jobDt =
+      QuartzSchedulerTypedExtension(_system).scheduleTyped("cronEveryMidnight", receiver, Tick)
     val nextRun = QuartzSchedulerTypedExtension(_system).nextTrigger("cronEveryMidnight")
 
     assert(nextRun.getOrElse(new java.util.Date()) == jobDt)
@@ -196,7 +222,12 @@ class QuartzTypedSchedulerFunctionalSpec
       val receiver = testKit.spawn(ScheduleTestReceiver())
 
       an[IllegalArgumentException] must be thrownBy {
-        QuartzSchedulerTypedExtension(_system).createSchedule("cronEvery10Seconds", None, "*/10 * * ? * *", None)
+        QuartzSchedulerTypedExtension(_system).createSchedule(
+          "cronEvery10Seconds",
+          None,
+          "*/10 * * ? * *",
+          None
+        )
       }
     }
 
@@ -204,44 +235,60 @@ class QuartzTypedSchedulerFunctionalSpec
       val receiver = testKit.spawn(ScheduleTestReceiver())
 
       an[IllegalArgumentException] must be thrownBy {
-        QuartzSchedulerTypedExtension(_system).createSchedule("nonExistingCron", None, "*/10 x * ? * *", None)
+        QuartzSchedulerTypedExtension(_system).createSchedule(
+          "nonExistingCron",
+          None,
+          "*/10 x * ? * *",
+          None
+        )
       }
     }
 
     "Add new, schedulable schedule with valid inputs" in {
       val receiver = testKit.spawn(ScheduleTestReceiver())
-      val probe = testKit.createTestProbe[AnyRef]()
+      val probe    = testKit.createTestProbe[AnyRef]()
       receiver ! NewProbe(probe.ref)
 
-      QuartzSchedulerTypedExtension(_system).createSchedule("nonExistingCron", Some("Creating new dynamic schedule"), "*/1 * * ? * *", None)
-      val jobDt = QuartzSchedulerTypedExtension(_system).scheduleTyped("nonExistingCron", receiver, Tick)
-
+      QuartzSchedulerTypedExtension(_system).createSchedule(
+        "nonExistingCron",
+        Some("Creating new dynamic schedule"),
+        "*/1 * * ? * *",
+        None
+      )
+      val jobDt =
+        QuartzSchedulerTypedExtension(_system).scheduleTyped("nonExistingCron", receiver, Tick)
 
       /* This is a somewhat questionable test as the timing between components may not match the tick off. */
       val receipt = probe.receiveMessages(5, Duration(30, SECONDS))
 
       receipt must contain(Tock)
-      receipt must have size (5)
+      receipt must have size 5
     }
   }
 
-  /**
-   * JobSchedule operations {create, update, delete} combine existing
-   * QuartzSchedulerExtension {createSchedule, schedule, rescheduleJob}
-   * and adds deleleteJobSchedule (unscheduleJob synonym created for naming
-   * consistency with existing rescheduleJob method).
-   */
+  /** JobSchedule operations {create, update, delete} combine existing
+    * QuartzSchedulerExtension {createSchedule, schedule, rescheduleJob}
+    * and adds deleleteJobSchedule (unscheduleJob synonym created for naming
+    * consistency with existing rescheduleJob method).
+    */
   "The Quartz Scheduling Extension with Dynamic create, update, delete JobSchedule operations" must {
-    
+
     "Throw exception if creating job schedule that already exists" in {
 
       val alreadyExistingScheduleJobName = "cronEvery10Seconds"
-      val receiver = testKit.spawn(ScheduleTestReceiver())
-      val probe = testKit.createTestProbe[AnyRef]()
+      val receiver                       = testKit.spawn(ScheduleTestReceiver())
+      val probe                          = testKit.createTestProbe[AnyRef]()
       receiver ! NewProbe(probe.ref)
 
-      an [IllegalArgumentException] must be thrownBy {
-        QuartzSchedulerTypedExtension(_system).createTypedJobSchedule(alreadyExistingScheduleJobName, receiver, Tick, None, "*/10 * * ? * *", None)
+      an[IllegalArgumentException] must be thrownBy {
+        QuartzSchedulerTypedExtension(_system).createTypedJobSchedule(
+          alreadyExistingScheduleJobName,
+          receiver,
+          Tick,
+          None,
+          "*/10 * * ? * *",
+          None
+        )
       }
     }
 
@@ -254,23 +301,37 @@ class QuartzTypedSchedulerFunctionalSpec
 
       val receiver = testKit.spawn(ScheduleTestReceiver())
 
-      an [IllegalArgumentException] must be thrownBy {
-        QuartzSchedulerTypedExtension(_system).createTypedJobSchedule("nonExistingCron_2", receiver, Tick, None, "*/10 x * ? * *", None)
+      an[IllegalArgumentException] must be thrownBy {
+        QuartzSchedulerTypedExtension(_system).createTypedJobSchedule(
+          "nonExistingCron_2",
+          receiver,
+          Tick,
+          None,
+          "*/10 x * ? * *",
+          None
+        )
       }
     }
 
     "Add new, schedulable job and schedule with valid inputs" in {
       val receiver = testKit.spawn(ScheduleTestReceiver())
-      val probe = testKit.createTestProbe[AnyRef]()
+      val probe    = testKit.createTestProbe[AnyRef]()
       receiver ! NewProbe(probe.ref)
 
-      val jobDt = QuartzSchedulerTypedExtension(_system).createTypedJobSchedule("nonExistingCron_2", receiver, Tick, Some("Creating new dynamic schedule"), "*/1 * * ? * *", None)
+      val jobDt = QuartzSchedulerTypedExtension(_system).createTypedJobSchedule(
+        "nonExistingCron_2",
+        receiver,
+        Tick,
+        Some("Creating new dynamic schedule"),
+        "*/1 * * ? * *",
+        None
+      )
 
       /* This is a somewhat questionable test as the timing between components may not match the tick off. */
       val receipt = probe.receiveMessages(5, Duration(30, SECONDS))
 
       receipt must contain(Tock)
-      receipt must have size(5)
+      receipt must have size 5
     }
 
     "Reschedule an existing job schedule Cron Job" in {
@@ -278,42 +339,68 @@ class QuartzTypedSchedulerFunctionalSpec
       val toRescheduleJobName = "toRescheduleCron_1"
 
       val receiver = testKit.spawn(ScheduleTestReceiver())
-      val probe = testKit.createTestProbe[AnyRef]()
+      val probe    = testKit.createTestProbe[AnyRef]()
       receiver ! NewProbe(probe.ref)
 
-      val jobDt = QuartzSchedulerTypedExtension(_system).createTypedJobSchedule(toRescheduleJobName, receiver, Tick, Some("Creating new dynamic schedule for updateJobSchedule test"), "*/4 * * ? * *")
+      val jobDt = QuartzSchedulerTypedExtension(_system).createTypedJobSchedule(
+        toRescheduleJobName,
+        receiver,
+        Tick,
+        Some("Creating new dynamic schedule for updateJobSchedule test"),
+        "*/4 * * ? * *"
+      )
 
       noException should be thrownBy {
-        val newFirstTimeTriggerDate = QuartzSchedulerTypedExtension(_system).updateTypedJobSchedule(toRescheduleJobName, receiver, Tick, Some("Updating new dynamic schedule for updateJobSchedule test"), "42 * * ? * *")
+        val newFirstTimeTriggerDate = QuartzSchedulerTypedExtension(_system).updateTypedJobSchedule(
+          toRescheduleJobName,
+          receiver,
+          Tick,
+          Some("Updating new dynamic schedule for updateJobSchedule test"),
+          "42 * * ? * *"
+        )
         val jobCalender = Calendar.getInstance()
         jobCalender.setTime(newFirstTimeTriggerDate)
         jobCalender.get(Calendar.SECOND) mustEqual 42
       }
     }
 
-
     "Delete an existing job schedule Cron Job without any error and allow successful creation of new schedule with identical job name" in {
 
       val toDeleteSheduleJobName = "toBeDeletedscheduleCron_1"
 
       val receiver = testKit.spawn(ScheduleTestReceiver())
-      val probe = testKit.createTestProbe[AnyRef]()
+      val probe    = testKit.createTestProbe[AnyRef]()
       receiver ! NewProbe(probe.ref)
 
-      val jobDt = QuartzSchedulerTypedExtension(_system).createTypedJobSchedule(toDeleteSheduleJobName, receiver, Tick, Some("Creating new dynamic schedule for deleteJobSchedule test"), "*/7 * * ? * *")
+      val jobDt = QuartzSchedulerTypedExtension(_system).createTypedJobSchedule(
+        toDeleteSheduleJobName,
+        receiver,
+        Tick,
+        Some("Creating new dynamic schedule for deleteJobSchedule test"),
+        "*/7 * * ? * *"
+      )
 
       noException should be thrownBy {
         // Delete existing scheduled job
-        val success = QuartzSchedulerTypedExtension(_system).deleteJobSchedule(toDeleteSheduleJobName)
+        val success =
+          QuartzSchedulerTypedExtension(_system).deleteJobSchedule(toDeleteSheduleJobName)
         if (success) {
 
           // Create a new schedule job reusing former toDeleteSheduleJobName. This will fail if delebeJobSchedule is not effective.
-          val newJobDt = QuartzSchedulerTypedExtension(_system).createTypedJobSchedule(toDeleteSheduleJobName, receiver, Tick, Some("Creating new dynamic schedule after deleteJobSchedule success"), "8 * * ? * *")
+          val newJobDt = QuartzSchedulerTypedExtension(_system).createTypedJobSchedule(
+            toDeleteSheduleJobName,
+            receiver,
+            Tick,
+            Some("Creating new dynamic schedule after deleteJobSchedule success"),
+            "8 * * ? * *"
+          )
           val jobCalender = Calendar.getInstance()
           jobCalender.setTime(newJobDt)
           jobCalender.get(Calendar.SECOND) mustEqual 8
         } else {
-          fail(s"deleteJobSchedule(${toDeleteSheduleJobName}) expected to return true returned false.")
+          fail(
+            s"deleteJobSchedule($toDeleteSheduleJobName) expected to return true returned false."
+          )
         }
       }
     }
@@ -323,15 +410,18 @@ class QuartzTypedSchedulerFunctionalSpec
       val nonExistingCronToBeDeleted = "nonExistingCronToBeDeleted"
 
       val receiver = testKit.spawn(ScheduleTestReceiver())
-      val probe = testKit.createTestProbe[AnyRef]()
+      val probe    = testKit.createTestProbe[AnyRef]()
       receiver ! NewProbe(probe.ref)
 
       noException should be thrownBy {
         // Deleting non existing scheduled job
-        val success = QuartzSchedulerTypedExtension(_system).deleteJobSchedule(nonExistingCronToBeDeleted)
+        val success =
+          QuartzSchedulerTypedExtension(_system).deleteJobSchedule(nonExistingCronToBeDeleted)
         // must return false
         if (success) {
-          fail(s"deleteJobSchedule(${nonExistingCronToBeDeleted}) expected to return false returned true.")
+          fail(
+            s"deleteJobSchedule($nonExistingCronToBeDeleted) expected to return false returned true."
+          )
         }
       }
     }
@@ -341,14 +431,18 @@ class QuartzTypedSchedulerFunctionalSpec
   sealed trait QuartzMessage
   case class NewProbe(probe: ActorRef[AnyRef]) extends QuartzMessage
 
-  case class TockWithFireTime(scheduledFireTime: Long, previousFireTime: Option[Long], nextFireTime: Option[Long]) extends QuartzMessage
+  case class TockWithFireTime(
+      scheduledFireTime: Long,
+      previousFireTime: Option[Long],
+      nextFireTime: Option[Long]
+  ) extends QuartzMessage
 
   case object Tick extends QuartzMessage
 
   case object Tock extends QuartzMessage
 
   object ScheduleTestReceiver {
-    private val log: Logger = Logger.getLogger(getClass.getSimpleName)
+    private val log: Logger            = Logger.getLogger(getClass.getSimpleName)
     var probe: ActorRef[QuartzMessage] = _
 
     def apply(): Behavior[AnyRef] = Behaviors.receiveMessage {
@@ -362,11 +456,14 @@ class QuartzTypedSchedulerFunctionalSpec
         Behaviors.same
 
       case MessageWithFireTime(Tick, scheduledFireTime, previousFireTime, nextFireTime) =>
-        log.info(s"Got a Tick for scheduledFireTime=${scheduledFireTime} previousFireTime=${previousFireTime} nextFireTime=${nextFireTime}")
+        log.info(
+          s"Got a Tick for scheduledFireTime=$scheduledFireTime previousFireTime=$previousFireTime nextFireTime=$nextFireTime"
+        )
         probe ! TockWithFireTime(
           scheduledFireTime.getTime,
           previousFireTime.map(u => u.getTime),
-          nextFireTime.map(u => u.getTime))
+          nextFireTime.map(u => u.getTime)
+        )
         Behaviors.same
 
       case _ =>

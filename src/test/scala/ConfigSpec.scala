@@ -8,13 +8,15 @@ import org.specs2.matcher.ThrownExpectations
 import org.specs2.runner.JUnitRunner
 
 @RunWith(classOf[JUnitRunner])
-class ConfigSpec extends Specification with ThrownExpectations { def is =
-  sequential ^
-  "This is a specification of the default configuration of the QuartzSchedulerExtension" ^ p ^
-  "The reference configuration should" ^
-    "contain all default values to setup a thread pool"       ! parseReferenceThreadPool ^
-    "contain the default timezone ID"                         ! parseReferenceTimezone ^
-                                                                end
+class ConfigSpec extends Specification with ThrownExpectations {
+
+  def is =
+    sequential ^
+      "This is a specification of the default configuration of the QuartzSchedulerExtension" ^ p ^
+      "The reference configuration should" ^
+      "contain all default values to setup a thread pool" ! parseReferenceThreadPool ^
+      "contain the default timezone ID" ! parseReferenceTimezone ^
+      end
 
   lazy val reference = ConfigFactory.load("reference.conf")
 
@@ -25,8 +27,7 @@ class ConfigSpec extends Specification with ThrownExpectations { def is =
     reference.getInt("akka.quartz.threadPool.threadCount") mustEqual 1
   }
 
-  def parseReferenceTimezone = {
+  def parseReferenceTimezone =
     reference.getString("akka.quartz.defaultTimezone") mustEqual "UTC"
-  }
 
 }

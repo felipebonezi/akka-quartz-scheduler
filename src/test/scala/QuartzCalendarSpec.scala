@@ -1,44 +1,45 @@
 package com.typesafe.akka.extension.quartz
 
-import java.time.LocalDate
-
-import org.specs2.runner.JUnitRunner
-import org.specs2.Specification
-import org.junit.runner.RunWith
-import org.specs2.matcher.ThrownExpectations
 import com.typesafe.config.ConfigFactory
-import java.util.{Calendar, Date, TimeZone}
-
-import scala.collection.JavaConverters._
+import org.junit.runner.RunWith
 import org.quartz.impl.calendar._
+import org.specs2.Specification
+import org.specs2.matcher.ThrownExpectations
+import org.specs2.runner.JUnitRunner
+
+import java.time.LocalDate
+import java.util.Calendar
+import java.util.Date
+import java.util.TimeZone
+import scala.collection.JavaConverters._
 
 @RunWith(classOf[JUnitRunner])
-class QuartzCalendarSpec extends Specification with ThrownExpectations { def is =
-  sequential ^
-  "This is a specification to validate the behavior of the Quartz Calendar configuration modelling"   ^
-                                                            p ^
-  "The configuration parser should"                           ^
-    "Fetch a list of all calendars in a configuration block"  ! parseCalendarList ^
-    "Be able to parse and create an Annual calendar"          ! parseAnnual ^
-    "Be able to parse and create a Holiday calendar"          ! parseHoliday ^
-    "Be able to parse and create a Daily calendar"            ^
-        "With a standard entry"                               ! parseDaily ^
-                                                            p ^
-    "Be able to parse and create a Monthly calendar"          ^
-        "With just one day (a list, but single digit)"        ! parseMonthlyOneDay ^
-        "With a list (multiple digits)"                       ! parseMonthlyList ^
-                                                            p ^
-    "Be able to parse and create a Weekly calendar"           ^
-        "With Ints for Day Names"                             ! parseWeeklyInt ^
-                                                            p ^
-    "Be able to parse and create a Cron calendar"             ! parseCronStyle ^
-                                                                end
+class QuartzCalendarSpec extends Specification with ThrownExpectations {
 
+  def is =
+    sequential ^
+      "This is a specification to validate the behavior of the Quartz Calendar configuration modelling" ^
+      p ^
+      "The configuration parser should" ^
+      "Fetch a list of all calendars in a configuration block" ! parseCalendarList ^
+      "Be able to parse and create an Annual calendar" ! parseAnnual ^
+      "Be able to parse and create a Holiday calendar" ! parseHoliday ^
+      "Be able to parse and create a Daily calendar" ^
+      "With a standard entry" ! parseDaily ^
+      p ^
+      "Be able to parse and create a Monthly calendar" ^
+      "With just one day (a list, but single digit)" ! parseMonthlyOneDay ^
+      "With a list (multiple digits)" ! parseMonthlyList ^
+      p ^
+      "Be able to parse and create a Weekly calendar" ^
+      "With Ints for Day Names" ! parseWeeklyInt ^
+      p ^
+      "Be able to parse and create a Cron calendar" ! parseCronStyle ^
+      end
 
-  def parseCalendarList = {
+  def parseCalendarList =
     //TODO - more robust check
-    calendars must have size(7)
-  }
+    calendars must have size 7
 
   def parseAnnual = {
     calendars must haveKey("WinterClosings")
@@ -47,13 +48,13 @@ class QuartzCalendarSpec extends Specification with ThrownExpectations { def is 
 
     import Calendar._
 
-    cal.isDayExcluded(getCalendar(JANUARY,   1, 1995)) must beTrue
-    cal.isDayExcluded(getCalendar(JANUARY,   1, 1975)) must beTrue
-    cal.isDayExcluded(getCalendar(JANUARY,   1, 2075)) must beTrue
+    cal.isDayExcluded(getCalendar(JANUARY, 1, 1995)) must beTrue
+    cal.isDayExcluded(getCalendar(JANUARY, 1, 1975)) must beTrue
+    cal.isDayExcluded(getCalendar(JANUARY, 1, 2075)) must beTrue
 
-    cal.isDayExcluded(getCalendar(JANUARY,   2, 1995)) must beFalse
-    cal.isDayExcluded(getCalendar(JANUARY,   2, 1975)) must beFalse
-    cal.isDayExcluded(getCalendar(JANUARY,   2, 2075)) must beFalse
+    cal.isDayExcluded(getCalendar(JANUARY, 2, 1995)) must beFalse
+    cal.isDayExcluded(getCalendar(JANUARY, 2, 1975)) must beFalse
+    cal.isDayExcluded(getCalendar(JANUARY, 2, 2075)) must beFalse
 
     cal.isDayExcluded(getCalendar(DECEMBER, 25, 1995)) must beTrue
     cal.isDayExcluded(getCalendar(DECEMBER, 25, 1975)) must beTrue
@@ -64,20 +65,21 @@ class QuartzCalendarSpec extends Specification with ThrownExpectations { def is 
     cal.isDayExcluded(getCalendar(DECEMBER, 31, 2075)) must beFalse
   }
 
- def parseHoliday = {
-   calendars must haveKey("Easter")
-   calendars("Easter") must haveClass[HolidayCalendar]
+  def parseHoliday = {
+    calendars must haveKey("Easter")
+    calendars("Easter") must haveClass[HolidayCalendar]
 
-   calendars("Easter").asInstanceOf[HolidayCalendar].getExcludedDates.asScala must containAllOf(List(
-     getDate(2013, 3, 31),
-     getDate(2014, 4, 20),
-     getDate(2015, 4,  5),
-     getDate(2016, 3, 27),
-     getDate(2017, 4, 16)
-   ))
+    calendars("Easter").asInstanceOf[HolidayCalendar].getExcludedDates.asScala must containAllOf(
+      List(
+        getDate(2013, 3, 31),
+        getDate(2014, 4, 20),
+        getDate(2015, 4, 5),
+        getDate(2016, 3, 27),
+        getDate(2017, 4, 16)
+      )
+    )
 
- }
-
+  }
 
   def parseDaily = {
     calendars must haveKey("HourOfTheWolf")
@@ -128,7 +130,7 @@ class QuartzCalendarSpec extends Specification with ThrownExpectations { def is 
     cal.getCronExpression.toString must beEqualTo("* * 0-7,18-23 ? * *")
   }
 
-  lazy val sampleConfiguration = {
+  lazy val sampleConfiguration =
     ConfigFactory.parseString("""
         calendars {
           WinterClosings {
@@ -173,18 +175,17 @@ class QuartzCalendarSpec extends Specification with ThrownExpectations { def is 
           }
         }
       """.stripMargin)
-  }
 
-  def getCalendar(month: Int, day: Int, year: Int)(implicit tz: TimeZone = TimeZone.getTimeZone("UTC")): Calendar = {
+  def getCalendar(month: Int, day: Int, year: Int)(implicit
+      tz: TimeZone = TimeZone.getTimeZone("UTC")
+  ): Calendar = {
     val _day = Calendar.getInstance(tz)
     _day.set(year, month, day)
     _day
   }
 
-  def getDate(year: Int, month: Int, day: Int): Date = {
+  def getDate(year: Int, month: Int, day: Int): Date =
     Date.from(LocalDate.of(year, month, day).atStartOfDay(java.time.ZoneId.systemDefault).toInstant)
-  }
-
 
   lazy val calendars = QuartzCalendars(sampleConfiguration, TimeZone.getDefault)
 

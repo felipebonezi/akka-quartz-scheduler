@@ -1,8 +1,12 @@
 package com.typesafe.akka.extension.quartz
 
-import akka.actor.typed.{ActorRef, ActorSystem, Extension, ExtensionId}
+import akka.actor.typed.ActorRef
+import akka.actor.typed.ActorSystem
+import akka.actor.typed.Extension
+import akka.actor.typed.ExtensionId
 
-import java.util.{Date, TimeZone}
+import java.util.Date
+import java.util.TimeZone
 
 object QuartzSchedulerTypedExtension extends ExtensionId[QuartzSchedulerTypedExtension] {
 
@@ -14,87 +18,102 @@ object QuartzSchedulerTypedExtension extends ExtensionId[QuartzSchedulerTypedExt
 
 }
 
-class QuartzSchedulerTypedExtension(system: ActorSystem[_]) extends QuartzSchedulerExtension(system.classicSystem) with Extension {
+class QuartzSchedulerTypedExtension(system: ActorSystem[_])
+    extends QuartzSchedulerExtension(system.classicSystem)
+    with Extension {
 
-  /**
-   * Creates job, associated triggers and corresponding schedule at once.
-   *
-   *
-   * @param name The name of the job, as defined in the schedule
-   * @param receiver An ActorRef, who will be notified each time the schedule fires
-   * @param msg A message object, which will be sent to `receiver` each time the schedule fires
-   * @param description A string describing the purpose of the job
-   * @param cronExpression A string with the cron-type expression
-   * @param calendar An optional calendar to use.
-   * @param timezone The time zone to use if different from default.
-
-   * @return A date which indicates the first time the trigger will fire.
-   */
+  /** Creates job, associated triggers and corresponding schedule at once.
+    *
+    * @param name The name of the job, as defined in the schedule
+    * @param receiver An ActorRef, who will be notified each time the schedule fires
+    * @param msg A message object, which will be sent to `receiver` each time the schedule fires
+    * @param description A string describing the purpose of the job
+    * @param cronExpression A string with the cron-type expression
+    * @param calendar An optional calendar to use.
+    * @param timezone The time zone to use if different from default.
+    *
+    * @return A date which indicates the first time the trigger will fire.
+    */
   def createTypedJobSchedule[T](
-                         name: String, receiver: ActorRef[T], msg: T, description: Option[String] = None,
-                         cronExpression: String, calendar: Option[String] = None, timezone: TimeZone = defaultTimezone) = {
+      name: String,
+      receiver: ActorRef[T],
+      msg: T,
+      description: Option[String] = None,
+      cronExpression: String,
+      calendar: Option[String] = None,
+      timezone: TimeZone = defaultTimezone
+  ) = {
     createSchedule(name, description, cronExpression, calendar, timezone)
     scheduleTyped(name, receiver, msg)
   }
 
-  /**
-   * Updates job, associated triggers and corresponding schedule at once.
-   *
-   *
-   * @param name The name of the job, as defined in the schedule
-   * @param receiver An ActorRef, who will be notified each time the schedule fires
-   * @param msg A message object, which will be sent to `receiver` each time the schedule fires
-   * @param description A string describing the purpose of the job
-   * @param cronExpression A string with the cron-type expression
-   * @param calendar An optional calendar to use.
-   * @param timezone The time zone to use if different from default.
-
-   * @return A date which indicates the first time the trigger will fire.
-   */
+  /** Updates job, associated triggers and corresponding schedule at once.
+    *
+    * @param name The name of the job, as defined in the schedule
+    * @param receiver An ActorRef, who will be notified each time the schedule fires
+    * @param msg A message object, which will be sent to `receiver` each time the schedule fires
+    * @param description A string describing the purpose of the job
+    * @param cronExpression A string with the cron-type expression
+    * @param calendar An optional calendar to use.
+    * @param timezone The time zone to use if different from default.
+    *
+    * @return A date which indicates the first time the trigger will fire.
+    */
   def updateTypedJobSchedule[T](
-                         name: String, receiver: ActorRef[T], msg: T, description: Option[String] = None,
-                         cronExpression: String, calendar: Option[String] = None, timezone: TimeZone = defaultTimezone): Date = {
+      name: String,
+      receiver: ActorRef[T],
+      msg: T,
+      description: Option[String] = None,
+      cronExpression: String,
+      calendar: Option[String] = None,
+      timezone: TimeZone = defaultTimezone
+  ): Date =
     rescheduleTypedJob(name, receiver, msg, description, cronExpression, calendar, timezone)
-  }
 
-  /**
-   * Reschedule a job
-   *
-   * @param name           A String identifying the job
-   * @param receiver       An ActorRef, who will be notified each time the schedule fires
-   * @param msg            A message object, which will be sent to `receiver` each time the schedule fires
-   * @param description    A string describing the purpose of the job
-   * @param cronExpression A string with the cron-type expression
-   * @param calendar       An optional calendar to use.
-   * @return A date which indicates the first time the trigger will fire.
-   */
+  /** Reschedule a job
+    *
+    * @param name           A String identifying the job
+    * @param receiver       An ActorRef, who will be notified each time the schedule fires
+    * @param msg            A message object, which will be sent to `receiver` each time the schedule fires
+    * @param description    A string describing the purpose of the job
+    * @param cronExpression A string with the cron-type expression
+    * @param calendar       An optional calendar to use.
+    * @return A date which indicates the first time the trigger will fire.
+    */
 
-  def rescheduleTypedJob[T](name: String, receiver: ActorRef[T], msg: T, description: Option[String] = None,
-                    cronExpression: String, calendar: Option[String] = None, timezone: TimeZone = defaultTimezone): Date = {
+  def rescheduleTypedJob[T](
+      name: String,
+      receiver: ActorRef[T],
+      msg: T,
+      description: Option[String] = None,
+      cronExpression: String,
+      calendar: Option[String] = None,
+      timezone: TimeZone = defaultTimezone
+  ): Date = {
     cancelJob(name)
     removeSchedule(name)
     createSchedule(name, description, cronExpression, calendar, timezone)
     scheduleInternal(name, receiver, msg.asInstanceOf[AnyRef], None)
   }
 
-  /**
-   * Schedule a job, whose named configuration must be available
-   *
-   * @param name     A String identifying the job, which must match configuration
-   * @param receiver An ActorRef, who will be notified each time the schedule fires
-   * @param msg      A message object, which will be sent to `receiver` each time the schedule fires
-   * @return A date which indicates the first time the trigger will fire.
-   */
-  def scheduleTyped[T](name: String, receiver: ActorRef[T], msg: T): Date = scheduleInternal(name, receiver, msg.asInstanceOf[AnyRef], None)
+  /** Schedule a job, whose named configuration must be available
+    *
+    * @param name     A String identifying the job, which must match configuration
+    * @param receiver An ActorRef, who will be notified each time the schedule fires
+    * @param msg      A message object, which will be sent to `receiver` each time the schedule fires
+    * @return A date which indicates the first time the trigger will fire.
+    */
+  def scheduleTyped[T](name: String, receiver: ActorRef[T], msg: T): Date =
+    scheduleInternal(name, receiver, msg.asInstanceOf[AnyRef], None)
 
-  /**
-   * Schedule a job, whose named configuration must be available
-   *
-   * @param name     A String identifying the job, which must match configuration
-   * @param receiver An ActorRef, who will be notified each time the schedule fires
-   * @param msg      A message object, which will be sent to `receiver` each time the schedule fires
-   * @return A date which indicates the first time the trigger will fire.
-   */
-  def scheduleTyped[T](name: String, receiver: ActorRef[T], msg: T, startDate: Option[Date]): Date = scheduleInternal(name, receiver, msg.asInstanceOf[AnyRef], startDate)
+  /** Schedule a job, whose named configuration must be available
+    *
+    * @param name     A String identifying the job, which must match configuration
+    * @param receiver An ActorRef, who will be notified each time the schedule fires
+    * @param msg      A message object, which will be sent to `receiver` each time the schedule fires
+    * @return A date which indicates the first time the trigger will fire.
+    */
+  def scheduleTyped[T](name: String, receiver: ActorRef[T], msg: T, startDate: Option[Date]): Date =
+    scheduleInternal(name, receiver, msg.asInstanceOf[AnyRef], startDate)
 
 }
